@@ -13,12 +13,7 @@
   %2 = load i32* %x, align 4
   %3 = load i32* %y, align 4
   %4 = mul nsw i32 %2, %3
-  ;%esp = alloca i32
-  ;%tmp = mul nsw i32 %2, %3
-  ;store i32 %tmp, i32* %s1
-
-  ;%tmp = load i32* %s1
-  store i32 %tmp, i32* %a, align 4
+  store i32 %4, i32* %a, align 4
   %5 = load i32* %y, align 4
   %6 = load i32* %z, align 4
   %7 = add nsw i32 %5, %6
@@ -28,15 +23,15 @@
   %10 = icmp sgt i32 %8, %9
   br i1 %10, label %11, label %13
 
-; <label>:11                                      ; preds = %0
+; <label>:11                                      
   %12 = load i32* %x, align 4
   br label %15
 
-; <label>:13                                      ; preds = %0
+; <label>:13                                     
   %14 = load i32* %y, align 4
   br label %15
 
-; <label>:15                                      ; preds = %13, %11
+; <label>:15                                    
   %16 = phi i32 [ %12, %11 ], [ %14, %13 ]
   store i32 %16, i32* %c, align 4
   %17 = load i32* %a, align 4
