@@ -91,42 +91,45 @@ ConvertInstruction(const std::vector<Inst>& instructions,
     for (auto i : instructions) {
         std::string dest_str;
         std::function<void (void)> delay_fn;
-        std::for_each(std::sregex_token_iterator(i.begin(), i.end(), r, {-1, 1}),
-                        std::sregex_token_iterator(),
-                        [&](auto x) {
-                            if (isdigit(x.str().front())) {
-                                int key = std::stoi(x);
-                                int value = register_map.at(key);
+        auto iter = std::sregex_token_iterator(i.begin(), i.end(), r, {-1, 1}), 
+             iter_end = std::sregex_token_iterator();
+        
+        for (; iter != iter_end; iter++) {
+            auto& x = *iter;
+            if (isdigit(x.str().front())) {
+                int key = std::stoi(x);
+                int value = register_map.at(key);
 
-                                if (value > 0) {
-                                /* it could map to a physical register */
-                                    dest_str += "%" + std::to_string(value);
-                                } else {
-                                /* when the spilled register occur at the first time, alloca a space for it 
-                                 * after that, load it to tmp register and store it back
-                                 */
-                                    value = abs(value);
-                                    std::string regi("%s" + std::to_string(value));
-                                    if (spilled.find(value) == spilled.end()) {
-                                        spilled.insert(value);
-                                        res.push_back(regi + "= alloca i32, align 4");
-                                    }
-                                    res.push_back("%tmp = load i32* " + regi);
-                                    dest_str += "%tmp";
-                                    delay_fn = [=, &res]{
-                                        res.push_back("store i32 %tmp, i32* " + regi);
-                                    };
-                                }
-                            } else {
-                                dest_str += x;
-                            }
-                        });
+                if (value > 0) {
+                    /* it could map to a physical register */
+                    dest_str += "%" + std::to_string(value);
+                } else {
+                    /* when the spilled register occur at the first time, alloca a space for it 
+                     * after that, load it to tmp register and store it back
+                     */
+                    value = abs(value);
+                    std::string regi("%s" + std::to_string(value));
+                    if (spilled.find(value) == spilled.end()) {
+                        spilled.insert(value);
+                        res.push_back(regi + "= alloca i32, align 4");
+                    }
+                    res.push_back("%tmp = load i32* " + regi);
+                    dest_str += "%tmp";
+                    delay_fn = [=, &res]{
+                        res.push_back("store i32 %tmp, i32* " + regi);
+                    };
+                }
+            } else {
+                dest_str += x;
+            }
+        }  /* end of regex loop */
         if (!dest_str.empty()) 
             res.push_back(dest_str);
         if (delay_fn) delay_fn();
-    }
+    } /* end of instruction loop */
     return res;
 }
+
 /**
  * @param instructions: stream of instructions
  * @param num_register: number of register to use, except for special registers 
