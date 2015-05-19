@@ -1,3 +1,8 @@
+/**
+ * Register Allocation implemented in LSRA algorithm.
+ * author: HelloCode
+ * email:  huanmingwong@163.com
+ */
 #include <cstdio>
 #include <vector>
 #include <map>
@@ -6,7 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-
+#include <unordered_set>
 
 namespace lsra {
 using Inst = std::string;
@@ -81,29 +86,44 @@ ConvertInstruction(const std::vector<Inst>& instructions,
                    const std::map<int, int>& register_map) {
     std::vector<Inst> res;
     std::regex r("%(\\d+)");
+    std::unordered_set<int> spilled;
     
     for (auto i : instructions) {
         std::string dest_str;
-        std::for_each(std::sregex_token_iterator(i.begin(), i.end(), r, {-1, 0}),
+        std::function<void (void)> delay_fn;
+        std::for_each(std::sregex_token_iterator(i.begin(), i.end(), r, {-1, 1}),
                         std::sregex_token_iterator(),
                         [&](auto x) {
-                            
-                            if (x.str()[0] == '%') {
-                                int key = std::stoi(x.str().substr(1));
+                            if (isdigit(x.str().front())) {
+                                int key = std::stoi(x);
                                 int value = register_map.at(key);
 
                                 if (value > 0) {
                                 /* it could map to a physical register */
                                     dest_str += "%" + std::to_string(value);
                                 } else {
-                                    dest_str += "%" + std::to_string(value);
+                                /* when the spilled register occur at the first time, alloca a space for it 
+                                 * after that, load it to tmp register and store it back
+                                 */
+                                    value = abs(value);
+                                    std::string regi("%s" + std::to_string(value));
+                                    if (spilled.find(value) == spilled.end()) {
+                                        spilled.insert(value);
+                                        res.push_back(regi + "= alloca i32, align 4");
+                                    }
+                                    res.push_back("%tmp = load i32* " + regi);
+                                    dest_str += "%tmp";
+                                    delay_fn = [=, &res]{
+                                        res.push_back("store i32 %tmp, i32* " + regi);
+                                    };
                                 }
                             } else {
                                 dest_str += x;
                             }
                         });
-        if (dest_str.empty()) dest_str = i;
-        res.push_back(dest_str);
+        if (!dest_str.empty()) 
+            res.push_back(dest_str);
+        if (delay_fn) delay_fn();
     }
     return res;
 }
@@ -164,7 +184,7 @@ int main()
         instructions.push_back(line);
     }
 
-    auto res = LSRA(instructions, 4);
+    auto res = LSRA(instructions, 3);
 
     for (auto& i : res) {
         std::cout << i << std::endl;
